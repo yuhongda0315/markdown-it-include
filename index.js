@@ -40,8 +40,6 @@ module.exports = function include_plugin(md, options) {
       if(isExist){
         mdSrc = fs.readFileSync(filePath, 'utf8');
         mdSrc = _replaceIncludeByContent(mdSrc, path.dirname(filePath), filePath, filesProcessed);
-      }else{
-        console.warn(filePath, 'is not exist')
       }
       src = src.slice(0, cap.index) + mdSrc + src.slice(cap.index + cap[0].length, src.length);
       
