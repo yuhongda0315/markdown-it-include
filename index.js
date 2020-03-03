@@ -18,6 +18,39 @@ module.exports = function include_plugin(md, options) {
     }
   }
 
+  function format(url){
+    var [filePath, strs] = url.split('?')
+    var queryString;
+    if(strs){
+      queryString = {};
+      strs = strs.split('&');
+      strs.forEach((str) => {
+        var params = str.split('=');
+        queryString[params[0]] = params[1];
+      });
+    }
+    return {
+      queryString: queryString,
+      url: filePath
+    }
+  }
+  function tplEngine(tpl, data, regexp) {
+    if (!(Object.prototype.toString.call(data) === '[object Array]')) {
+      data = [data];
+    }
+    let ret = [];
+    let replaceAction = (object) => {
+      return tpl.replace(regexp || (/\\?\{([^}]+)\}/g), (match, name) => {
+        if (match.charAt(0) === '\\') return match.slice(1);
+        return (object[name] !== undefined) ? object[name] : '{' + name + '}';
+      });
+    };
+    for (let i = 0, j = data.length; i < j; i++) {
+      ret.push(replaceAction(data[i]));
+    }
+    return ret.join('');
+  }
+
   function _replaceIncludeByContent(src, rootdir, parentFilePath, filesProcessed) {
     filesProcessed = filesProcessed ? filesProcessed.slice() : []; // making a copy
     var cap, filePath, mdSrc, indexOfCircularRef;
@@ -27,7 +60,8 @@ module.exports = function include_plugin(md, options) {
       filesProcessed.push(parentFilePath);
     }
     while ((cap = includeRe.exec(src))) {
-      filePath = path.resolve(rootdir, cap[1].trim());
+      var app = format(cap[1].trim())
+      filePath = path.resolve(rootdir,app.url);
 
       // check if circular reference
       indexOfCircularRef = filesProcessed.indexOf(filePath);
@@ -36,13 +70,13 @@ module.exports = function include_plugin(md, options) {
       }
 
       // replace include by file content
-      var isExist = fs.existsSync(filePath);
-      if(isExist){
-        mdSrc = fs.readFileSync(filePath, 'utf8');
-        mdSrc = _replaceIncludeByContent(mdSrc, path.dirname(filePath), filePath, filesProcessed);
-      }
+      mdSrc = fs.readFileSync(filePath, 'utf8');
+      mdSrc = _replaceIncludeByContent(mdSrc, path.dirname(filePath), filePath, filesProcessed);
       src = src.slice(0, cap.index) + mdSrc + src.slice(cap.index + cap[0].length, src.length);
-      
+      var queryString = app.queryString;
+      if(queryString){
+        src = tplEngine(src, queryString);
+      }
     }
     return src;
   }
